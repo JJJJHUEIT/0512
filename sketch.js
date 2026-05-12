@@ -64,10 +64,13 @@ function draw() {
   if (faces.length > 0) {
     let face = faces[0];
     
-    // 更新穩定器並取得平滑後的座標與透明度
-    // 使用更穩定的耳垂索引：361 為右耳垂，132 為左耳垂
-    let rightEar = rightEarStabilizer.update(face.keypoints[361], millis());
-    let leftEar = leftEarStabilizer.update(face.keypoints[132], millis());
+    // 確保 keypoints 存在後再進行更新
+    // 132 與 361 是 MediaPipe FaceMesh 最穩定的耳垂邊界點
+    let rightEarPt = face.keypoints[361] || face.keypoints[176];
+    let leftEarPt = face.keypoints[132] || face.keypoints[400];
+
+    let rightEar = rightEarStabilizer.update(rightEarPt, millis());
+    let leftEar = leftEarStabilizer.update(leftEarPt, millis());
 
     if (rightEar.isVisible) {
       drawStableEarring(rightEar, w, h);
@@ -87,13 +90,13 @@ function drawStableEarring(state, imgW, imgH) {
   let px = map(state.x, 0, vW, 0, imgW);
   let py = map(state.y, 0, vH, 0, imgH);
 
-  // 套用平滑後的透明度
-  fill(255, 255, 0, state.opacity * 255); 
-  stroke(0, state.opacity * 255); // 加上黑色外框增加辨識度
-  strokeWeight(2);
+  // 改用高對比紅色，增加可視度
+  fill(255, 0, 0, state.opacity * 255); 
+  stroke(255, 255, 255, state.opacity * 255); // 白色外框在紫色背景更亮
+  strokeWeight(3);
   
   for (let i = 1; i <= 3; i++) {
-    circle(px, py + (i * 15), 10);
+    circle(px, py + (i * 18), 12); // 加大圓圈直徑
   }
 }
 
@@ -106,18 +109,18 @@ function windowResized() {
  */
 class EarringStabilizer {
   constructor() {
-    this.filterX = new OneEuroFilter(0.1, 0.01); // minCutoff=0.1 增加靜止穩定度
-    this.filterY = new OneEuroFilter(0.1, 0.01);
+    this.filterX = new OneEuroFilter(0.5, 0.01); // 提高 minCutoff 減少延遲
+    this.filterY = new OneEuroFilter(0.5, 0.01);
     this.opacity = 0;
     this.lastPos = { x: 0, y: 0 };
   }
 
   update(pt, timestamp) {
-    let isDetected = pt && pt.x !== undefined && pt.y !== undefined;
+    let isDetected = pt && pt.x !== undefined;
     
     // 1. 透明度平滑 (Fade in/out)
     let targetOpacity = isDetected ? 1.0 : 0.0;
-    this.opacity += (targetOpacity - this.opacity) * 0.2; // 稍微加快淡入速度
+    this.opacity += (targetOpacity - this.opacity) * 0.25; // 加快反應速度
 
     // 2. 座標過濾
     if (isDetected) {
