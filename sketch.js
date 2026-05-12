@@ -67,8 +67,12 @@ function drawEarring(pt, imgW, imgH) {
   // 將偵測點從影片解析度 (640x480) 映射到顯示的大小 (imgW, imgH)
   let vW = video.width || 640;
   let vH = video.height || 480;
-  let px = map(pt.x, 0, vW, 0, imgW);
-  let py = map(pt.y, 0, vH, 0, imgH);
+  
+  // 計算原始點位在未翻轉影像上的 X 座標
+  let mappedPx = map(pt.x, 0, vW, 0, imgW);
+  // 由於影像已左右翻轉，實際繪製時需要將 X 座標從右側計算
+  let px = imgW - mappedPx;
+  let py = map(pt.y, 0, vH, 0, imgH); // Y 座標不受左右翻轉影響
 
   fill(255, 255, 0); // 黃色
   noStroke();
