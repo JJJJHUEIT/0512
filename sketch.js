@@ -109,18 +109,19 @@ function windowResized() {
  */
 class EarringStabilizer {
   constructor() {
-    this.filterX = new OneEuroFilter(0.5, 0.01); // 提高 minCutoff 減少延遲
-    this.filterY = new OneEuroFilter(0.5, 0.01);
+    // 降低 minCutoff (0.05) 讓靜止時極度穩定，降低 beta (0.005) 讓移動更絲滑
+    this.filterX = new OneEuroFilter(0.05, 0.005);
+    this.filterY = new OneEuroFilter(0.05, 0.005);
     this.opacity = 0;
     this.lastPos = { x: 0, y: 0 };
   }
 
   update(pt, timestamp) {
-    let isDetected = pt && pt.x !== undefined;
+    let isDetected = pt && pt.x !== undefined && pt.y !== undefined;
     
     // 1. 透明度平滑 (Fade in/out)
     let targetOpacity = isDetected ? 1.0 : 0.0;
-    this.opacity += (targetOpacity - this.opacity) * 0.25; // 加快反應速度
+    this.opacity += (targetOpacity - this.opacity) * 0.1; // 減緩淡入淡出，增加視覺連續性
 
     // 2. 座標過濾
     if (isDetected) {
