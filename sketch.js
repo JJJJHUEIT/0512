@@ -138,23 +138,32 @@ function getFingerCount(hand) {
 }
 
 function drawCoolBackground() {
-  // 繪製深藍色調的動態漸層
-  noStroke();
-  for (let i = 0; i <= height; i += 10) {
-    let inter = map(i, 0, height, 0, 1);
-    // 產生深邃的星空色調
-    let c = lerpColor(color('#0f0c29'), color('#302b63'), inter);
-    fill(c);
-    rect(0, i, width, 10);
-  }
+  // 改成科技感的深藍色動態格線背景
+  background(10, 15, 35); 
   
-  // 增加一些閃爍的動態光點（星星）
-  fill(255, 255, 255, 80);
-  for (let i = 0; i < 40; i++) {
-    let xStar = noise(i, frameCount * 0.002) * width;
-    let yStar = noise(i + 10, frameCount * 0.002) * height;
-    let size = noise(i + 20, frameCount * 0.01) * 6;
-    circle(xStar, yStar, size);
+  stroke(0, 255, 255, 50); // 半透明的青色線條
+  strokeWeight(1);
+  
+  let gridSize = 60;
+  let xOffset = (frameCount * 0.5) % gridSize;
+  let yOffset = (frameCount * 0.3) % gridSize;
+
+  // 繪製垂直流動線
+  for (let x = xOffset; x < width; x += gridSize) {
+    line(x, 0, x, height);
+  }
+  // 繪製水平流動線
+  for (let y = yOffset; y < height; y += gridSize) {
+    line(0, y, width, y);
+  }
+
+  // 增加一些隨機漂浮的數位光點
+  noStroke();
+  fill(0, 255, 255, 100);
+  for (let i = 0; i < 20; i++) {
+    let nx = noise(i * 10, frameCount * 0.002) * width;
+    let ny = noise(i * 20, frameCount * 0.002) * height;
+    circle(nx, ny, 3);
   }
 }
 
