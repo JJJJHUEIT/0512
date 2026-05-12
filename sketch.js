@@ -11,12 +11,12 @@ function preload() {
   faceMesh = ml5.faceMesh();
   // 載入手勢辨識模型
   handPose = ml5.handPose();
-  // 載入五種耳環圖片
-  earringImages[0] = loadImage('pic/acc/acc1_ring.png');
-  earringImages[1] = loadImage('pic/acc/acc2_pearl.png');
-  earringImages[2] = loadImage('pic/acc/acc3_tassel.png');
-  earringImages[3] = loadImage('pic/acc/acc4_jade.png');
-  earringImages[4] = loadImage('pic/acc/acc5_phoenix.png');
+  // 載入五種耳環圖片，並加入錯誤處理
+  earringImages[0] = loadImage('./pic/acc/acc1_ring.png', () => console.log("acc1 loaded"), () => console.error("acc1 404"));
+  earringImages[1] = loadImage('./pic/acc/acc2_pearl.png', () => console.log("acc2 loaded"), () => console.error("acc2 404"));
+  earringImages[2] = loadImage('./pic/acc/acc3_tassel.png', () => console.log("acc3 loaded"), () => console.error("acc3 404"));
+  earringImages[3] = loadImage('./pic/acc/acc4_jade.png', () => console.log("acc4 loaded"), () => console.error("acc4 404"));
+  earringImages[4] = loadImage('./pic/acc/acc5_phoenix.png', () => console.log("acc5 loaded"), () => console.error("acc5 404"));
 }
 
 function setup() {
@@ -103,45 +103,20 @@ function draw() {
   pop();
 }
 
-function drawEarring(earX, earY, imgW, imgH, side) {
+function drawEarring(earX, earY, imgW, imgH) {
   // 將偵測到的原始影片座標(固定為 640x480)對應到畫面上顯示的影像大小
+  // 改用固定的 640 與 480，避免影片尚未載入時造成座標計算錯誤
   let px = map(earX, 0, 640, 0, imgW);
   let py = map(earY, 0, 480, 0, imgH);
 
-  let img = earringImages[currentEarringIndex];
   // 設定耳環寬度（約為影像寬度的 10%），並根據原圖比例計算高度
   let earringWidth = imgW * 0.1;
-  let earringHeight = earringWidth * (img.height / img.width);
-
-  // 比率移動：往外移動寬度的 15%，往上移動高度的 10%
-  let xOffset = earringWidth * 0.15;
-  let yOffset = earringHeight * 0.1;
-
-  // 根據左右耳調整往「外」的方向
-  let finalX = (side === 'left') ? px - xOffset : px + xOffset;
-  let finalY = py - yOffset;
+  let earringHeight = earringWidth * (earringImg.height / earringImg.width);
 
   // 繪製耳環圖片，中心點設在耳垂位置下方，讓耳環看起來像掛在耳朵上
   imageMode(CENTER);
-  image(img, finalX, finalY + earringHeight / 2, earringWidth, earringHeight);
+  image(earringImg, px, py + earringHeight / 2, earringWidth, earringHeight);
   imageMode(CORNER); // 恢復預設模式以免影響其他繪圖作業
-}
-
-// 簡易手指數計算函數
-function getFingerCount(hand) {
-  let count = 0;
-  // 食指(8)、中指(12)、無名指(16)、小指(20) 的尖端是否高於(Y較小)第二關節
-  if (hand.keypoints[8].y < hand.keypoints[6].y) count++;
-  if (hand.keypoints[12].y < hand.keypoints[10].y) count++;
-  if (hand.keypoints[16].y < hand.keypoints[14].y) count++;
-  if (hand.keypoints[20].y < hand.keypoints[18].y) count++;
-  
-  // 大拇指(4)：計算與食指根部(5)的距離來判定
-  let thumbTip = hand.keypoints[4];
-  let indexBase = hand.keypoints[5];
-  if (dist(thumbTip.x, thumbTip.y, indexBase.x, indexBase.y) > 40) count++;
-  
-  return count;
 }
 
 function windowResized() {
