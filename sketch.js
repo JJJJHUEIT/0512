@@ -65,9 +65,9 @@ function draw() {
     let face = faces[0];
     
     // 更新穩定器並取得平滑後的座標與透明度
-    // 176 為右耳，400 為左耳
-    let rightEar = rightEarStabilizer.update(face.keypoints[176], millis());
-    let leftEar = leftEarStabilizer.update(face.keypoints[400], millis());
+    // 使用更穩定的耳垂索引：361 為右耳垂，132 為左耳垂
+    let rightEar = rightEarStabilizer.update(face.keypoints[361], millis());
+    let leftEar = leftEarStabilizer.update(face.keypoints[132], millis());
 
     if (rightEar.isVisible) {
       drawStableEarring(rightEar, w, h);
@@ -89,7 +89,8 @@ function drawStableEarring(state, imgW, imgH) {
 
   // 套用平滑後的透明度
   fill(255, 255, 0, state.opacity * 255); 
-  noStroke();
+  stroke(0, state.opacity * 255); // 加上黑色外框增加辨識度
+  strokeWeight(2);
   
   for (let i = 1; i <= 3; i++) {
     circle(px, py + (i * 15), 10);
@@ -112,11 +113,11 @@ class EarringStabilizer {
   }
 
   update(pt, timestamp) {
-    let isDetected = pt && pt.x !== undefined;
+    let isDetected = pt && pt.x !== undefined && pt.y !== undefined;
     
     // 1. 透明度平滑 (Fade in/out)
     let targetOpacity = isDetected ? 1.0 : 0.0;
-    this.opacity += (targetOpacity - this.opacity) * 0.15;
+    this.opacity += (targetOpacity - this.opacity) * 0.2; // 稍微加快淡入速度
 
     // 2. 座標過濾
     if (isDetected) {
