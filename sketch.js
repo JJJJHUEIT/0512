@@ -4,34 +4,41 @@ let handPose;
 let faces = [];
 let hands = [];
 let earringImages = [];
-let currentEarringIndex = 0;
+let currentEarringImg;
+
+// 用於平滑化耳環位置的變數
+let smoothLeft = { x: 0, y: 0 };
+let smoothRight = { x: 0, y: 0 };
 
 function preload() {
-  // 改用 faceMesh，對於只有頭部入鏡的攝影機畫面辨識率極高
-  faceMesh = ml5.faceMesh();
-  // 載入手勢辨識模型
-  handPose = ml5.handPose();
-  // 載入五種耳環圖片，並加入錯誤處理
-  earringImages[0] = loadImage('./pic/acc/acc1_ring.png', () => console.log("acc1 loaded"), () => console.error("acc1 404"));
-  earringImages[1] = loadImage('./pic/acc/acc2_pearl.png', () => console.log("acc2 loaded"), () => console.error("acc2 404"));
-  earringImages[2] = loadImage('./pic/acc/acc3_tassel.png', () => console.log("acc3 loaded"), () => console.error("acc3 404"));
-  earringImages[3] = loadImage('./pic/acc/acc4_jade.png', () => console.log("acc4 loaded"), () => console.error("acc4 404"));
-  earringImages[4] = loadImage('./pic/acc/acc5_phoenix.png', () => console.log("acc5 loaded"), () => console.error("acc5 404"));
+  // 載入 ml5.js v1 模型
+  // 在 preload 載入可確保 setup 執行前模型已準備就緒
+  faceMesh = ml5.faceMesh({ maxFaces: 1, refineLandmarks: false, flipHorizontal: false });
+  handPose = ml5.handPose({ flipHorizontal: false });
+
+  // 載入 5 種耳環圖片
+  earringImages[0] = loadImage('picture/acc1_ring.png');
+  earringImages[1] = loadImage('picture/acc2_pearl.png');
+  earringImages[2] = loadImage('picture/acc3_tassel.png');
+  earringImages[3] = loadImage('picture/acc4_jade.png');
+  earringImages[4] = loadImage('picture/acc5_phoenix.png');
+  
+  // 預設使用第一款
+  currentEarringImg = earringImages[0];
 }
 
 function setup() {
   // 建立全螢幕畫布
   createCanvas(windowWidth, windowHeight);
   // 擷取攝影機影像
-  video = createCapture(VIDEO);
+  video = createCapture(VIDEO, (stream) => {
+    console.log("攝影機已啟動");
+    // 確保攝影機啟動後再開始偵測臉部與手部
+    faceMesh.detectStart(video, gotFaces);
+    handPose.detectStart(video, gotHands);
+  });
   video.size(640, 480); // 設定固定解析度以利辨識座標對應
-  // 隱藏原始的 HTML 影片元件
   video.hide();
-
-  // 開始持續偵測臉部
-  faceMesh.detectStart(video, gotFaces);
-  // 開始持續偵測手勢
-  handPose.detectStart(video, gotHands);
 }
 
 function gotFaces(results) {
@@ -40,83 +47,131 @@ function gotFaces(results) {
 }
 
 function gotHands(results) {
-  // 將辨識結果存入 hands 變數
+  // 將手勢辨識結果存入 hands 變數
   hands = results;
 }
 
 function draw() {
-  // 設定背景顏色為 e7c6ff
-  background('#e7c6ff');
+  // 繪製酷酷的動態漸層背景與星點
+  drawCoolBackground();
+
+  // 偵測手勢並切換耳環
+  if (hands.length > 0) {
+    let fingerCount = getFingerCount(hands[0]);
+    // 當手指數量在 1~5 之間時切換圖片
+    if (fingerCount >= 1 && fingerCount <= 5) {
+      currentEarringImg = earringImages[fingerCount - 1];
+    }
+  }
 
   let w = width * 0.5; // 畫布寬度的 50%
   let h = height * 0.5; // 畫布高度的 50%
   let x = (width - w) / 2; // 置中水平座標
   let y = (height - h) / 2; // 置中垂直座標
 
-  // 新增：繪製畫布上方文字
-  push();
-  fill(0); // 設定文字顏色為黑色
-  noStroke();
-  textAlign(CENTER, CENTER);
-  textSize(32);
-  text("412731068賴信宇", width / 2, y / 2 - 20);
-  textSize(24);
-  text("作品為影像辨識_耳環臉譜", width / 2, y / 2 + 20);
-  pop();
-
-  // 手勢辨識切換耳環索引
-  if (hands.length > 0) {
-    let fingerCount = getFingerCount(hands[0]);
-    if (fingerCount >= 1 && fingerCount <= 5) {
-      currentEarringIndex = fingerCount - 1;
-    }
-  }
-
   push();
   // 將座標系移動到影像預定位置的右緣，準備進行翻轉
   translate(x + w, y);
   // 水平翻轉 (x 軸 -1)
   scale(-1, 1);
+
+  // 幫影像加一個科技感的發光邊框
+  noFill();
+  stroke(255, 255, 0, 150);
+  strokeWeight(3);
+  rect(-3, -3, w + 6, h + 6, 10);
+
   // 繪製影像
   image(video, 0, 0, w, h);
 
-  // 若辨識到臉部特徵點，則在左右耳處畫出三個黃色圓圈 (耳環效果)
+  // 若辨識到臉部，則在左右耳垂處畫出三個黃色圓圈 (耳環效果)
   if (faces.length > 0) {
     let face = faces[0];
     
-    // FaceMesh 中，132 為左耳垂附近，361 為右耳垂附近
-    let leftEar = face.keypoints[132];
-    let rightEar = face.keypoints[361];
+    // 取得新的特徵點 (177: 左耳垂, 401: 右耳垂)
+    let ptL = face.keypoints[177];
+    let ptR = face.keypoints[401];
 
-    if (leftEar) drawEarring(leftEar.x, leftEar.y, w, h, 'left');
-    if (rightEar) drawEarring(rightEar.x, rightEar.y, w, h, 'right');
-  } else {
-    // 若沒有偵測到臉部，顯示提示文字 (需先還原翻轉狀態以免字體左右相反)
-    pop();
-    fill(255, 100, 100);
-    noStroke();
-    textSize(24);
-    textAlign(CENTER);
-    text("正在尋找臉部... (請確保臉部在鏡頭前)", width / 2, y - 20);
-    push(); // 補回 push 以免最後的 pop 報錯
+    if (ptL && ptR) {
+      // 使用 lerp 進行平滑化處理，0.1 比 0.2 更穩但會稍微慢一點點
+      smoothLeft.x = lerp(smoothLeft.x, ptL.x, 0.1);
+      smoothLeft.y = lerp(smoothLeft.y, ptL.y, 0.1);
+      smoothRight.x = lerp(smoothRight.x, ptR.x, 0.1);
+      smoothRight.y = lerp(smoothRight.y, ptR.y, 0.1);
+
+      drawEarring(smoothLeft, w, h);
+      drawEarring(smoothRight, w, h);
+    }
   }
   pop();
+
+  // --- 文字移到最上層繪製 ---
+  fill(255); // 白色文字在深色背景更明顯
+  textSize(32); // 放大一點比較清楚
+  textAlign(CENTER, TOP);
+  
+  // 為文字加上霓虹發光效果
+  drawingContext.shadowBlur = 20;
+  drawingContext.shadowColor = 'yellow'; 
+  text("412731068賴信宇", width / 2, 30);
+  text("作品為影像辨識_耳環臉譜", width / 2, 75);
+  drawingContext.shadowBlur = 0; // 取消發光避免影響後續繪圖
 }
 
-function drawEarring(earX, earY, imgW, imgH) {
-  // 將偵測到的原始影片座標(固定為 640x480)對應到畫面上顯示的影像大小
-  // 改用固定的 640 與 480，避免影片尚未載入時造成座標計算錯誤
-  let px = map(earX, 0, 640, 0, imgW);
-  let py = map(earY, 0, 480, 0, imgH);
+function getFingerCount(hand) {
+  let count = 0;
+  let keypoints = hand.keypoints;
 
-  // 設定耳環寬度（約為影像寬度的 10%），並根據原圖比例計算高度
-  let earringWidth = imgW * 0.1;
-  let earringHeight = earringWidth * (earringImg.height / earringImg.width);
+  // 判斷食指、中指、無名指、小指是否伸直 (Tip Y < Joint Y)
+  if (keypoints[8].y < keypoints[6].y) count++;
+  if (keypoints[12].y < keypoints[10].y) count++;
+  if (keypoints[16].y < keypoints[14].y) count++;
+  if (keypoints[20].y < keypoints[18].y) count++;
 
-  // 繪製耳環圖片，中心點設在耳垂位置下方，讓耳環看起來像掛在耳朵上
+  // 判斷大拇指 (比較大拇指尖與食指根部的距離)
+  let thumbTip = keypoints[4];
+  let thumbBase = keypoints[2];
+  let pinkyBase = keypoints[17];
+  if (dist(thumbTip.x, thumbTip.y, pinkyBase.x, pinkyBase.y) > dist(thumbBase.x, thumbBase.y, pinkyBase.x, pinkyBase.y)) count++;
+
+  return count;
+}
+
+function drawCoolBackground() {
+  // 繪製深藍色調的動態漸層
+  noStroke();
+  for (let i = 0; i <= height; i += 10) {
+    let inter = map(i, 0, height, 0, 1);
+    // 產生深邃的星空色調
+    let c = lerpColor(color('#0f0c29'), color('#302b63'), inter);
+    fill(c);
+    rect(0, i, width, 10);
+  }
+  
+  // 增加一些閃爍的動態光點（星星）
+  fill(255, 255, 255, 80);
+  for (let i = 0; i < 40; i++) {
+    let xStar = noise(i, frameCount * 0.002) * width;
+    let yStar = noise(i + 10, frameCount * 0.002) * height;
+    let size = noise(i + 20, frameCount * 0.01) * 6;
+    circle(xStar, yStar, size);
+  }
+}
+
+function drawEarring(pt, imgW, imgH) {
+  if (!pt) return;
+  // 將偵測到的影片座標對應到畫面上顯示的影像大小
+  let px = map(pt.x, 0, video.width, 0, imgW);
+  let py = map(pt.y, 0, video.height, 0, imgH);
+
+  // 顯示耳環圖片
+  // 將圖片中心點對準座標，並稍微往下偏移使其掛在耳垂
+  push();
   imageMode(CENTER);
-  image(earringImg, px, py + earringHeight / 2, earringWidth, earringHeight);
-  imageMode(CORNER); // 恢復預設模式以免影響其他繪圖作業
+  // 調整大小 (這裡設定寬 40, 高 60) 並在 y 軸增加偏移使耳環自然下墜
+  image(currentEarringImg, px, py + 25, 40, 60);
+  pop();
+  drawingContext.shadowBlur = 0;
 }
 
 function windowResized() {
